@@ -1,0 +1,175 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Upload de CSV</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f9f9f9;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        header {
+            margin-bottom: 20px;
+        }
+
+        #uploadForm {
+            margin-bottom: 20px;
+        }
+
+        #message {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: #333;
+            color: white;
+        }
+
+            .top-bar a {
+                color: white;
+                margin-right: 20px;
+                text-decoration: none;
+            }
+
+                .top-bar a:hover {
+                    text-decoration: underline;
+                }
+
+            .top-bar button {
+                background-color: #444;
+                border: none;
+                color: white;
+                padding: 10px 15px;
+                cursor: pointer;
+            }
+
+                .top-bar button:hover {
+                    background-color: #666;
+                }
+    </style>
+</head>
+<body>
+
+    <!-- Topo com login/logout e menu -->
+    <div class="top-bar">
+        <div class="menu" id="menu">
+            <!-- O menu será carregado dinamicamente -->
+        </div>
+        <div class="auth" id="auth">
+            <!-- Botão de login/logout será carregado dinamicamente -->
+        </div>
+    </div>
+
+    <div class="container">
+        <header>
+            <h1>Upload de Arquivo CSV</h1>
+        </header>
+
+        <main>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <input type="file" id="fileInput" name="file" accept=".csv" required />
+                <button type="submit">Upload</button>
+            </form>
+
+            <p id="message" aria-live="polite"></p> <!-- Acessibilidade -->
+        </main>
+    </div>
+
+    <script>
+        // Função para carregar o menu e o botão de login/logout
+        function loadMenu() {
+            fetch('http://localhost:3000/get-user')
+                .then(response => response.json())
+                .then(user => {
+                    const menu = document.getElementById('menu');
+                    const auth = document.getElementById('auth');
+
+                    // Limpar o conteúdo do menu e do auth
+                    menu.innerHTML = '';
+                    auth.innerHTML = '';
+
+                    // Menu de navegação
+                    const homeLink = '<a href="/index">Home</a>';
+                    menu.innerHTML += homeLink;
+
+                    if (user.role === 'admin') {
+                        menu.innerHTML += '<a href="admin_requests.html">Manage Requests</a>';
+                        menu.innerHTML += '<a href="uploads_page.html">upload</a>';
+                        menu.innerHTML += '<a href="register.html">register</a>';
+                    } else {
+                        menu.innerHTML += '<a href="/request-days-off">Request Days Off</a>';
+                    }
+
+                    // Botão de login/logout
+                    if (user.isLoggedIn) {
+                        auth.innerHTML = '<button onclick="logout()">Logout</button>';
+                    } else {
+                        auth.innerHTML = '<a href="/login">Login</a>';
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                });
+        }
+
+        // Função de logout
+        function logout() {
+            fetch('http://localhost:3000/logout', { method: 'POST' })
+                .then(() => {
+                    window.location.href = '/login'; // Redireciona para a página de login
+                });
+        }
+
+        // Carregar o menu quando a página carregar
+        window.onload = loadMenu;
+
+        // Função para o upload do arquivo CSV
+        document.getElementById('uploadForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            const button = event.target.querySelector('button');
+            button.disabled = true; // Desabilitar o botão enquanto o upload está em andamento
+            document.getElementById('message').textContent = 'Carregando...';
+
+            fetch('http://localhost:3000/upload', {
+                method: 'POST',
+                body: formData
+            })
+                .then(response => {
+                    button.disabled = false; // Habilitar o botão novamente
+                    if (!response.ok) {
+                        throw new Error('Erro ao fazer upload do arquivo.');
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    document.getElementById('message').textContent = data;
+                })
+                .catch(err => {
+                    button.disabled = false; // Habilitar o botão novamente em caso de erro
+                    document.getElementById('message').textContent = 'Erro: ' + err.message;
+                });
+        });
+    </script>
+</body>
+</html>

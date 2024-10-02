@@ -1,0 +1,150 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Request Days Off</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Topo com login/logout e menu -->
+    <div class="top-bar">
+        <div class="menu" id="menu">
+            <!-- O menu será carregado dinamicamente -->
+        </div>
+        <div class="auth" id="auth">
+            <!-- Botão de login/logout será carregado dinamicamente -->
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="request-box">
+            <h1>Request Days Off</h1>
+
+            <!-- Formulário para solicitar dias de folga -->
+            <form id="requestForm">
+                <label for="daysRequested">Days Requested:</label>
+                <input type="date" id="daysRequested" name="daysRequested" required><br><br>
+
+                <label for="reason">Reason:</label>
+                <textarea id="reason" name="reason" rows="4" required></textarea><br><br>
+
+                <button type="submit">Submit Request</button>
+            </form>
+            <p id="statusMessage"></p>
+
+            <!-- Lista de solicitações anteriores -->
+            <h2>Your Previous Requests</h2>
+            <table id="requestsTable">
+                <thead>
+                    <tr>
+                        <th>Days Requested</th>
+                        <th>Reason</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- As solicitações anteriores serão carregadas aqui -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Função para carregar o menu e o botão de login/logout
+        function loadMenu() {
+            fetch('http://localhost:3000/get-user')
+                .then(response => response.json())
+                .then(user => {
+                    const menu = document.getElementById('menu');
+                    const auth = document.getElementById('auth');
+
+                    // Limpar o conteúdo do menu e do auth
+                    menu.innerHTML = '';
+                    auth.innerHTML = '';
+
+                    // Menu de navegação
+                    const homeLink = '<a href="/index">Home</a>';
+                    menu.innerHTML += homeLink;
+
+                    if (user.role === 'admin') {
+                    } else {
+                        menu.innerHTML += '<a href="/request-days-off">Request Days Off</a>';
+                    }
+
+                    // Botão de login/logout
+                    if (user.isLoggedIn) {
+                        auth.innerHTML = '<button onclick="logout()">Logout</button>';
+                    } else {
+                        auth.innerHTML = '<a href="/login">Login</a>';
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                });
+        }
+
+        // Função de logout
+        function logout() {
+            fetch('http://localhost:3000/logout', { method: 'POST' })
+                .then(() => {
+                    window.location.href = '/login'; // Redireciona para a página de login
+                });
+        }
+
+        // Função para carregar as solicitações anteriores do usuário
+        function loadRequests() {
+            fetch('http://localhost:3000/user/requests')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#requestsTable tbody');
+                    tableBody.innerHTML = ''; // Limpa o conteúdo anterior
+                    data.userRequests.forEach(request => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                                    <td>${request.daysRequested}</td>
+                                    <td>${request.reason}</td>
+                                    <td>${request.status}</td>
+                                `;
+                        tableBody.appendChild(row);
+                    });
+                })
+                .catch(err => {
+                    document.getElementById('statusMessage').textContent = 'Erro ao carregar as solicitações: ' + err.message;
+                });
+        }
+
+        // Função para submeter o formulário de solicitação
+        document.getElementById('requestForm').addEventListener('submit', function (event) {
+            event.preventDefault();
+            const daysRequested = document.getElementById('daysRequested').value;
+            const reason = document.getElementById('reason').value;
+
+            // Limpa a mensagem anterior
+            document.getElementById('statusMessage').textContent = '';
+
+            fetch('http://localhost:3000/submit-request', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ daysRequested, reason })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('statusMessage').textContent = data.message;
+                    loadRequests(); // Atualiza a lista de solicitações
+                })
+                .catch(err => {
+                    document.getElementById('statusMessage').textContent = 'Erro ao cadastrar: ' + err.message;
+                });
+        });
+
+        // Carregar o menu e as solicitações ao carregar a página
+        window.onload = function () {
+            loadMenu();
+            loadRequests();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda com Importação de CSV</title>
+    <link rel="stylesheet" href="style.css"> <!-- Estilo externo -->
+</head>
+<body>
+    <!-- Topo com login/logout e menu -->
+    <div class="top-bar">
+        <div class="menu" id="menu">
+            <!-- O menu será carregado dinamicamente -->
+        </div>
+        <div class="auth" id="auth">
+            <!-- Botão de login/logout será carregado dinamicamente -->
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="login-box">
+            <h1>Stewarding Rota</h1>
+
+            <!-- Contêiner com rolagem horizontal para a tabela -->
+            <div class="table-container" id="table-container">
+                <table id="tabela" class="table">
+                    <thead>
+                        <tr>
+                            <!-- Cabeçalho será preenchido com dados do CSV -->
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Dados do CSV serão inseridos aqui -->
+                    </tbody>
+                </table>
+            </div>
+            <p id="message" aria-live="polite"></p> <!-- Mensagem para erros ou avisos -->
+        </div>
+    </div>
+
+    <script>
+        // Função para carregar o menu e o botão de login/logout
+        function loadMenu() {
+            fetch('http://localhost:3000/get-user')
+                .then(response => response.json())
+                .then(user => {
+                    const menu = document.getElementById('menu');
+                    const auth = document.getElementById('auth');
+
+                    // Limpar o conteúdo do menu e do auth
+                    menu.innerHTML = '';
+                    auth.innerHTML = '';
+
+                    // Menu de navegação
+                    const homeLink = '<a href="/index">Home</a>';
+                    menu.innerHTML += homeLink;
+
+                    if (user.role === 'admin') {
+                        menu.innerHTML += '<a href="admin_requests.html">Manage Requests</a>';
+                        menu.innerHTML += '<a href="uploads_page.html">upload</a>';
+                        menu.innerHTML += '<a href="register.html">register</a>';
+                    } else {
+                        menu.innerHTML += '<a href="/request-days-off">Request Days Off</a>';
+                    }
+
+                    // Botão de login/logout
+                    if (user.isLoggedIn) {
+                        auth.innerHTML = '<button onclick="logout()">Logout</button>';
+                    } else {
+                        auth.innerHTML = '<a href="/login">Login</a>';
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                });
+        }
+
+        // Função de logout
+        function logout() {
+            fetch('http://localhost:3000/logout', { method: 'POST' })
+                .then(() => {
+                    window.location.href = '/login'; // Redireciona para a página de login
+                });
+        }
+
+        // Carregar o menu quando a página carregar
+        window.onload = function () {
+            loadMenu();
+
+            fetch('http://localhost:3000/data')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro ao carregar dados: ' + response.statusText);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    const rows = text.split('\n').filter(row => row.trim() !== '');
+                    const tbody = document.querySelector('#tabela tbody');
+                    tbody.innerHTML = '';
+
+                    if (rows.length === 0) {
+                        document.getElementById('message').textContent = 'Nenhum dado disponível.';
+                        return;
+                    }
+
+                    rows.forEach((row, rowIndex) => {
+                        const cols = row.split(',').map(col => col.trim());
+                        const tr = document.createElement('tr');
+
+                        cols.forEach((col, colIndex) => {
+                            const td = document.createElement('td');
+                            td.textContent = col;
+
+                            if (colIndex === 0 || col === '') {
+                                td.style.backgroundColor = '#fff'; // Coluna de nomes e células vazias
+                            } else if (colorMapping[col]) {
+                                // Aplicar estilos do mapeamento de cores
+                                td.style.backgroundColor = colorMapping[col].backgroundColor;
+                                td.style.color = colorMapping[col].color;
+                            } else if (isNumeric(col)) {
+                                td.style.backgroundColor = '#A65F46'; // Cor para números não mapeados
+                                td.style.color = 'BLACK';
+                            } else {
+                                td.style.backgroundColor = '#7BA2BE'; // Cor para palavras/letras não mapeadas
+                                td.style.color = 'BLACK';
+                            }
+
+                            // Estilo especial para a primeira célula da primeira linha e primeira coluna
+                            if (rowIndex === 0 && colIndex === 0) {
+                                td.style.fontWeight = 'bold'; // Negrito
+                                td.style.fontSize = 'calc(1em + 25px)'; // Aumenta o tamanho da fonte
+                                td.style.backgroundColor = '#fffffff'; // Cor de fundo para a primeira célula (Exemplo: Dourado)
+                                td.style.color = '#6F6F6F'; // Cor do texto (Exemplo: Azul escuro)
+                            }
+
+                            tr.appendChild(td);
+                        });
+
+                        tbody.appendChild(tr);
+                    });
+                })
+                .catch(err => {
+                    document.getElementById('message').textContent = 'Erro ao carregar os dados: ' + err.message;
+                });
+
+            // Função "drag and scroll"
+            const tableContainer = document.getElementById('table-container');
+            let isDragging = false, startX, scrollLeft;
+
+            tableContainer.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                startX = e.pageX - tableContainer.offsetLeft;
+                scrollLeft = tableContainer.scrollLeft;
+            });
+
+            tableContainer.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+
+            tableContainer.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            tableContainer.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.pageX - tableContainer.offsetLeft;
+                const walk = (x - startX) * 1.5; // Sensibilidade do arrasto
+                tableContainer.scrollLeft = scrollLeft - walk;
+            });
+        };
+
+        // Função para verificar se é um número
+        function isNumeric(str) {
+            return !isNaN(str) && !isNaN(parseFloat(str));
+        }
+
+        const colorMapping = {
+            'mon': { backgroundColor: '#404040', color: 'white' },
+            'tue': { backgroundColor: '#404040', color: 'white' },
+            'wed': { backgroundColor: '#404040', color: 'white' },
+            'thu': { backgroundColor: '#404040', color: 'white' },
+            'fri': { backgroundColor: '#404040', color: 'white' },
+            'sat': { backgroundColor: '#404040', color: 'white' },
+            'sun': { backgroundColor: '#404040', color: 'white' },
+            '01': { backgroundColor: '#404040', color: 'white' },
+            '02': { backgroundColor: '#404040', color: 'white' },
+            '03': { backgroundColor: '#404040', color: 'white' },
+            '04': { backgroundColor: '#404040', color: 'white' },
+            '05': { backgroundColor: '#404040', color: 'white' },
+            '06': { backgroundColor: '#404040', color: 'white' },
+            '07': { backgroundColor: '#404040', color: 'white' },
+            '08': { backgroundColor: '#404040', color: 'white' },
+            '09': { backgroundColor: '#404040', color: 'white' },
+            '10': { backgroundColor: '#404040', color: 'white' },
+            '11': { backgroundColor: '#404040', color: 'white' },
+            '12': { backgroundColor: '#404040', color: 'white' },
+            '13': { backgroundColor: '#404040', color: 'white' },
+            '14': { backgroundColor: '#404040', color: 'white' },
+            '15': { backgroundColor: '#404040', color: 'white' },
+            '16': { backgroundColor: '#404040', color: 'white' },
+            '17': { backgroundColor: '#404040', color: 'white' },
+            '18': { backgroundColor: '#404040', color: 'white' },
+            '19': { backgroundColor: '#404040', color: 'white' },
+            '20': { backgroundColor: '#404040', color: 'white' },
+            '21': { backgroundColor: '#404040', color: 'white' },
+            '22': { backgroundColor: '#404040', color: 'white' },
+            '23': { backgroundColor: '#404040', color: 'white' },
+            '24': { backgroundColor: '#404040', color: 'white' },
+            '25': { backgroundColor: '#404040', color: 'white' },
+            '26': { backgroundColor: '#404040', color: 'white' },
+            '27': { backgroundColor: '#404040', color: 'white' },
+            '28': { backgroundColor: '#404040', color: 'white' },
+            '29': { backgroundColor: '#404040', color: 'white' },
+            '30': { backgroundColor: '#404040', color: 'white' },
+            '31': { backgroundColor: '#404040', color: 'white' },
+            'PL': { backgroundColor: '#FF0000', color: 'white' },
+            'sick': { backgroundColor: '#FF0000', color: 'white' },
+            'UA': { backgroundColor: '#FF0000', color: 'white' },
+            'UL': { backgroundColor: '#FF0000', color: 'white' },
+            'CL': { backgroundColor: '#FF0000', color: 'white' },
+            'A': { backgroundColor: '#FF0000', color: 'black' },
+            'BL': { backgroundColor: '#FF0000', color: 'black' },
+            'receiver': { backgroundColor: '#A9D08E', color: 'black' },
+            'POTS': { backgroundColor: '#FFEBB0', color: 'black' },
+            'Plates': { backgroundColor: '#FFC2C2', color: 'black' },
+            'Lounge': { backgroundColor: '#FFBD91', color: 'black' },
+            'RUNNER': { backgroundColor: '#305496', color: 'white' },
+            'Canteen': { backgroundColor: '#878787', color: 'white' },
+            'OFF-R': { backgroundColor: '#757171', color: '#FFE699' },
+            'OFF': { backgroundColor: '#fff', color: 'black' },
+            '06:30 15:00': { backgroundColor: '#B4C6E7', color: 'black' },
+            '15:00 23:30': { backgroundColor: '#FFD966', color: 'black' },
+            '05:30 14:00': { backgroundColor: '#A9D08E', color: 'black' },
+            'H': { backgroundColor: '#91568F', color: 'white' }
+        };
+    </script>
+</body>
+</html>

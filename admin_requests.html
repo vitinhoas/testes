@@ -1,0 +1,127 @@
+﻿<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Requests - Admin</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Topo com login/logout e menu -->
+    <div class="top-bar">
+        <div class="menu" id="menu">
+            <!-- O menu será carregado dinamicamente -->
+        </div>
+        <div class="auth" id="auth">
+            <!-- Botão de login/logout será carregado dinamicamente -->
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Manage Days Off Requests</h1>
+        <table id="requestTable">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Days Requested</th>
+                    <th>Reason</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Requests will be dynamically added here -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Função para carregar o menu e o botão de login/logout
+        function loadMenu() {
+            fetch('http://localhost:3000/get-user')
+                .then(response => response.json())
+                .then(user => {
+                    const menu = document.getElementById('menu');
+                    const auth = document.getElementById('auth');
+
+                    // Limpar o conteúdo do menu e do auth
+                    menu.innerHTML = '';
+                    auth.innerHTML = '';
+
+                    // Menu de navegação
+                    const homeLink = '<a href="/index">Home</a>';
+                    menu.innerHTML += homeLink;
+
+                    if (user.role === 'admin') {
+                        menu.innerHTML += '<a href="admin_requests.html">Manage Requests</a>';
+                        menu.innerHTML += '<a href="uploads_page.html">upload</a>';
+                        menu.innerHTML += '<a href="register.html">register</a>';
+                    } else {
+                        menu.innerHTML += '<a href="/request-days-off">Request Days Off</a>';
+                    }
+
+                    // Botão de login/logout
+                    if (user.isLoggedIn) {
+                        auth.innerHTML = '<button onclick="logout()">Logout</button>';
+                    } else {
+                        auth.innerHTML = '<a href="/login">Login</a>';
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                });
+        }
+
+        // Função de logout
+        function logout() {
+            fetch('http://localhost:3000/logout', { method: 'POST' })
+                .then(() => {
+                    window.location.href = '/login'; // Redireciona para a página de login
+                });
+        }
+
+        // Função para carregar as solicitações de dias de folga
+        function loadRequests() {
+            fetch('http://localhost:3000/admin/requests')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#requestTable tbody');
+                    tableBody.innerHTML = ''; // Limpa o conteúdo anterior
+                    data.requests.forEach(request => {
+                        const row = document.createElement('tr');
+
+                        row.innerHTML = `
+                                        <td>${request.user}</td>
+                                        <td>${request.daysRequested}</td>
+                                        <td>${request.reason}</td>
+                                        <td>${request.status}</td>
+                                        <td>
+                                            <button onclick="approveRequest('${request.id}')">Approve</button>
+                                            <button onclick="denyRequest('${request.id}')">Deny</button>
+                                        </td>
+                                    `;
+                        tableBody.appendChild(row);
+                    });
+                });
+        }
+
+        // Função para aprovar uma solicitação
+        function approveRequest(id) {
+            fetch(`http://localhost:3000/admin/approve/${id}`, { method: 'POST' })
+                .then(() => loadRequests());
+        }
+
+        // Função para negar uma solicitação
+        function denyRequest(id) {
+            fetch(`http://localhost:3000/admin/deny/${id}`, { method: 'POST' })
+                .then(() => loadRequests());
+        }
+
+        // Carregar o menu e as solicitações ao carregar a página
+        window.onload = function () {
+            loadMenu();
+            loadRequests();
+        };
+    </script>
+</body>
+</html>
